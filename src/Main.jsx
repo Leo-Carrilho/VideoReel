@@ -5,6 +5,8 @@ import {
   useVideoConfig,
   spring,
   interpolate,
+  Img,
+  staticFile,
 } from "remotion";
 
 const colors = {
@@ -267,244 +269,12 @@ const Divider = () => (
   }} />
 );
 
-// ─── CENA DRONE CINEMATOGRÁFICA ───────────────────────────────────────────────
-const DroneScene = ({ localFrame, totalFrames }) => {
-  const progress = localFrame / totalFrames;
-
-  const camX     = interpolate(progress, [0, 1], [0, -60]);
-  const camY     = interpolate(progress, [0, 1], [0, 20]);
-  const camScale = interpolate(progress, [0, 1], [1.0, 1.08]);
-
-  const droneX    = interpolate(progress, [0, 0.5, 1], [180, 400, 650]);
-  const droneY    = interpolate(progress, [0, 0.25, 0.5, 0.75, 1], [280, 260, 275, 255, 270]);
-  const droneTilt = interpolate(progress, [0, 0.5, 1], [-8, 0, 6]);
-
-  const floatOffset = Math.sin(localFrame * 0.18) * 5;
-  const floatTilt   = Math.sin(localFrame * 0.12) * 2;
-
-  const trailPositions = Array.from({ length: 6 }, (_, i) => {
-    const t = Math.max(0, progress - (i + 1) * 0.012);
-    return {
-      x: interpolate(t, [0, 0.5, 1], [180, 400, 650]),
-      y: interpolate(t, [0, 0.25, 0.5, 0.75, 1], [280, 260, 275, 255, 270]),
-      opacity: interpolate(i, [0, 5], [0.35, 0.03]),
-      scale:   interpolate(i, [0, 5], [0.85, 0.3]),
-    };
-  });
-
-  const cloud1X = interpolate(progress, [0, 1], [120, 160]);
-  const cloud2X = interpolate(progress, [0, 1], [520, 560]);
-  const cloud3X = interpolate(progress, [0, 1], [820, 870]);
-  const sunGlow = interpolate(Math.sin(localFrame * 0.08), [-1, 1], [0.6, 1.0]);
-
-  return (
-    <svg viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg"
-      style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }}>
-      <defs>
-        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#87CEEB" />
-          <stop offset="40%"  stopColor="#B8E4F7" />
-          <stop offset="100%" stopColor="#D6F0FF" />
-        </linearGradient>
-        <linearGradient id="fieldGrad1" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#4a7c2f" />
-          <stop offset="100%" stopColor="#2d5a1b" />
-        </linearGradient>
-        <linearGradient id="fieldGrad2" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#5a9e36" />
-          <stop offset="100%" stopColor="#3a7020" />
-        </linearGradient>
-        <linearGradient id="fieldGrad3" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#3d6b25" />
-          <stop offset="100%" stopColor="#254515" />
-        </linearGradient>
-        <linearGradient id="soilGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#8B6914" />
-          <stop offset="100%" stopColor="#5a4209" />
-        </linearGradient>
-        <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
-          <stop offset="0%"   stopColor="transparent" />
-          <stop offset="100%" stopColor="rgba(0,20,10,0.45)" />
-        </radialGradient>
-        <filter id="cloudBlur"><feGaussianBlur stdDeviation="8" /></filter>
-        <filter id="sunGlowF">
-          <feGaussianBlur stdDeviation="18" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="droneShadow">
-          <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="rgba(0,0,0,0.5)" />
-        </filter>
-        <filter id="droneGlowF">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <clipPath id="frameClip">
-          <rect x="0" y="0" width="1080" height="1920" />
-        </clipPath>
-      </defs>
-
-      <g clipPath="url(#frameClip)"
-        transform={`translate(${camX}, ${camY}) scale(${camScale})`}
-        style={{ transformOrigin: "540px 960px" }}>
-
-        {/* Céu */}
-        <rect x="-100" y="0" width="1300" height="1200" fill="url(#skyGrad)" />
-
-        {/* Sol */}
-        <circle cx="820" cy="160" r="90" fill="#FFE066" opacity={sunGlow} filter="url(#sunGlowF)" />
-        <circle cx="820" cy="160" r="65" fill="#FFD700" opacity="0.95" />
-        <circle cx="820" cy="160" r="50" fill="#FFF0A0" opacity="0.9" />
-
-        {/* Nuvem 1 */}
-        <g transform={`translate(${cloud1X}, 140)`} opacity="0.92">
-          <ellipse cx="0"   cy="0"   rx="100" ry="48" fill="white" />
-          <ellipse cx="-60" cy="10"  rx="60"  ry="38" fill="white" />
-          <ellipse cx="65"  cy="8"   rx="70"  ry="42" fill="white" />
-          <ellipse cx="10"  cy="-15" rx="55"  ry="35" fill="#f5f5f5" />
-        </g>
-        {/* Nuvem 2 */}
-        <g transform={`translate(${cloud2X}, 200)`} opacity="0.85">
-          <ellipse cx="0"   cy="0"  rx="75" ry="35" fill="white" />
-          <ellipse cx="-45" cy="8"  rx="48" ry="28" fill="white" />
-          <ellipse cx="48"  cy="6"  rx="50" ry="30" fill="white" />
-        </g>
-        {/* Nuvem 3 */}
-        <g transform={`translate(${cloud3X}, 120)`} opacity="0.78">
-          <ellipse cx="0"   cy="0"   rx="90" ry="42" fill="white" />
-          <ellipse cx="-55" cy="10"  rx="52" ry="32" fill="white" />
-          <ellipse cx="55"  cy="7"   rx="58" ry="34" fill="white" />
-          <ellipse cx="5"   cy="-12" rx="45" ry="28" fill="#f0f0f0" />
-        </g>
-
-        {/* Campos */}
-        <polygon points="-80,820 480,780 480,1100 -80,1150" fill="url(#fieldGrad1)" />
-        {Array.from({ length: 10 }, (_, i) => (
-          <line key={`rl-${i}`}
-            x1={-80 + i * 60} y1={820 + i * 4}
-            x2={-80 + i * 60 + 20} y2={1150 + i * 2}
-            stroke="rgba(0,0,0,0.12)" strokeWidth="2" />
-        ))}
-
-        <polygon points="480,760 760,770 760,1080 480,1080" fill="url(#fieldGrad2)" />
-        {Array.from({ length: 8 }, (_, i) => (
-          <line key={`rc-${i}`}
-            x1={480 + i * 35} y1={760}
-            x2={480 + i * 35} y2={1080}
-            stroke="rgba(0,0,0,0.1)" strokeWidth="1.5" />
-        ))}
-
-        <polygon points="760,775 1160,800 1160,1140 760,1090" fill="url(#fieldGrad3)" />
-        {Array.from({ length: 10 }, (_, i) => (
-          <line key={`rr-${i}`}
-            x1={760 + i * 45} y1={775 + i * 3}
-            x2={760 + i * 45 + 15} y2={1100 + i * 2}
-            stroke="rgba(0,0,0,0.1)" strokeWidth="2" />
-        ))}
-
-        <polygon points="-80,1140 1160,1120 1160,1300 -80,1300" fill="url(#soilGrad)" />
-
-        {/* Campo frontal com plantas */}
-        <polygon points="-80,1260 1160,1240 1160,1650 -80,1680" fill="#3d8c2a" />
-        {Array.from({ length: 22 }, (_, col) =>
-          Array.from({ length: 5 }, (_, row) => {
-            const px = -60 + col * 56;
-            const py = 1290 + row * 80;
-            return (
-              <g key={`pl-${col}-${row}`} transform={`translate(${px}, ${py})`}>
-                <ellipse cx="0" cy="-8" rx="10" ry="14" fill="#4ea82d" opacity="0.85" />
-                <rect x="-1.5" y="-8" width="3" height="18" fill="#3a7a20" />
-              </g>
-            );
-          })
-        )}
-
-        {/* Vinheta */}
-        <rect x="-100" y="0" width="1300" height="1920" fill="url(#vignette)" />
-
-        {/* God rays */}
-        <g opacity={interpolate(sunGlow, [0.6, 1.0], [0.04, 0.08])}>
-          {[0, 15, -15, 28, -28].map((angle, i) => (
-            <rect key={`ray-${i}`} x="795" y="150" width="50" height="900"
-              fill="rgba(255,240,120,0.4)"
-              transform={`rotate(${angle} 820 160)`}
-              style={{ transformOrigin: "820px 160px" }} />
-          ))}
-        </g>
-
-        {/* Rastro */}
-        {trailPositions.map((t, i) => (
-          <g key={`trail-${i}`}
-            transform={`translate(${t.x}, ${t.y + floatOffset}) scale(${t.scale})`}
-            opacity={t.opacity}>
-            <ellipse cx="0" cy="0" rx="22" ry="8" fill={colors.cyan} />
-          </g>
-        ))}
-
-        {/* Drone */}
-        <g transform={`translate(${droneX}, ${droneY + floatOffset}) rotate(${droneTilt + floatTilt})`}
-          filter="url(#droneShadow)"
-          style={{ transformOrigin: `${droneX}px ${droneY}px` }}>
-          <rect x="-22" y="-10" width="44" height="20" rx="6" ry="6"
-            fill="#1a1a2e" stroke={colors.cyan} strokeWidth="1.5" />
-          <circle cx="0" cy="12" r="7" fill="#0d0d1a" stroke="#00ccff" strokeWidth="1" />
-          <circle cx="0" cy="12" r="4" fill="#001a26" />
-          <circle cx="0" cy="-4" r="3" fill={colors.cyan}
-            opacity={0.7 + Math.sin(localFrame * 0.4) * 0.3} />
-          {[[-36, -30], [36, -30], [-36, 30], [36, 30]].map(([ax, ay], i) => (
-            <g key={`arm-${i}`}>
-              <line x1="0" y1="0" x2={ax} y2={ay}
-                stroke="#333355" strokeWidth="4" strokeLinecap="round" />
-              <circle cx={ax} cy={ay} r="8" fill="#222244" stroke="#444466" strokeWidth="1.5" />
-              <g transform={`translate(${ax}, ${ay}) rotate(${localFrame * 22 * (i % 2 === 0 ? 1 : -1)})`}
-                style={{ transformOrigin: `${ax}px ${ay}px` }}>
-                <ellipse cx="0" cy="0" rx="18" ry="3.5" fill={colors.cyan} opacity="0.45" />
-              </g>
-              <g transform={`translate(${ax}, ${ay}) rotate(${90 + localFrame * 22 * (i % 2 === 0 ? 1 : -1)})`}
-                style={{ transformOrigin: `${ax}px ${ay}px` }}>
-                <ellipse cx="0" cy="0" rx="18" ry="3.5" fill={colors.cyan} opacity="0.45" />
-              </g>
-            </g>
-          ))}
-          <ellipse cx="0" cy="60" rx="30" ry="8"
-            fill={colors.cyan} opacity={0.06 + Math.sin(localFrame * 0.15) * 0.03}
-            filter="url(#droneGlowF)" />
-        </g>
-
-        {/* HUD */}
-        <rect x="0" y="0"    width="1080" height="60" fill="rgba(0,0,0,0.55)" />
-        <rect x="0" y="1860" width="1080" height="60" fill="rgba(0,0,0,0.55)" />
-        <text x="40" y="42" fill={colors.cyan} fontFamily="'Courier New', monospace" fontSize="26" opacity="0.75">
-          ZENITH AGRO · ALT 85m · {Math.round(8 + progress * 4)} km/h
-        </text>
-        <text x="900" y="42" fill="rgba(255,255,255,0.5)" fontFamily="'Courier New', monospace" fontSize="22" opacity="0.6">
-          4K · REC
-        </text>
-        <circle cx="878" cy="34" r="7" fill="#ff3333"
-          opacity={0.6 + Math.sin(localFrame * 0.3) * 0.4} />
-        <text x="40" y="1895" fill="rgba(255,255,255,0.4)" fontFamily="'Courier New', monospace" fontSize="22" opacity="0.6">
-          22°44'S  47°20'W · Americana - SP
-        </text>
-
-        {/* Lens flare */}
-        {progress > 0.35 && progress < 0.65 && (
-          <g opacity={interpolate(progress, [0.35, 0.5, 0.65], [0, 0.18, 0])}>
-            <ellipse cx="540" cy="300" rx="600" ry="80"
-              fill="rgba(255,255,200,0.6)" filter="url(#cloudBlur)" />
-            <circle cx="540" cy="300" r="20" fill="rgba(255,255,255,0.5)" />
-          </g>
-        )}
-
-      </g>
-    </svg>
-  );
-};
-
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 //
 // Mapa de cenas (30fps):
 //   Cena 1 : 0   → 120   Cena 2 : 120 → 240   Cena 3 : 240 → 360
 //   Cena 4 : 360 → 480   Cena 5 : 480 → 720   Cena 6 : 720 → 820
-//   Cena 7 : 820 → 940   Cena 8 : 940 → 1180  (drone)
+//   Cena 7 : 820 → 940
 //
 // Transições: cada elemento tem FadeXxx na entrada + FadeOutXxx na saída.
 // As funções FadeOut* usam `end` do SceneContext para o frame regressivo.
@@ -716,15 +486,24 @@ export const Main = () => {
 
             <FadeUp delay={8}>
               <FadeOutUp exitBefore={18}>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, width: "90%", maxWidth: 500 }}>
+                <div style={{display: "flex",flexDirection: "column",gap: 16,width: "98%",maxWidth: 760,}}>
                   {diseases.map((disease, i) => (
-                    <div key={i} style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "18px 24px", borderRadius: 16,
-                      background: "rgba(13, 36, 31, 0.85)", backdropFilter: "blur(16px)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      boxShadow: "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 0 1px rgba(0,255,149,0.04)",
-                    }}>
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "28px 34px",
+                        minHeight: 110,
+                        borderRadius: 20,
+                        background: "rgba(13, 36, 31, 0.85)",
+                        backdropFilter: "blur(16px)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        boxShadow:
+                          "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 0 1px rgba(0,255,149,0.04)",
+                      }}
+                    >
                       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                         <span style={{ color: "#E2E8F0", fontFamily: font.body, fontSize: 32, fontWeight: 500, letterSpacing: "0.01em", lineHeight: 1.2 }}>{disease.name}</span>
                       </div>
@@ -860,7 +639,7 @@ export const Main = () => {
 
           <FadeUp delay={0}>
             <FadeOutUp exitBefore={22}>
-            <img src="/assets/image/img_logo.jpeg" alt="ZENITH AGRO" />
+            <Img src={staticFile("/assets/image/img_logo.jpeg")} alt="ZENITH AGRO" style={{ maxWidth: "100%", height: "auto", marginBottom: 24, filter: "drop-shadow(0 0 10px rgba(0,255,149,0.5))" }} />
             </FadeOutUp>
           </FadeUp>
 
@@ -877,48 +656,4 @@ export const Main = () => {
         </Screen>
       </Scene>
     );
-
-  // ── CENA 8 — DRONE CINEMATOGRÁFICO ────────────────────────────────────────
-  // Duração: frames 940 → 1180 (8s @ 30fps)
-  // Atualize durationInFrames: 1180 no root.tsx / index.ts
-  const DRONE_START      = 940;
-  const DRONE_END        = 1180;
-  const droneLocal       = frame - DRONE_START;
-  const droneTotalFrames = DRONE_END - DRONE_START;
-
-  return (
-    <Scene start={DRONE_START} end={DRONE_END}>
-      <AbsoluteFill style={{ background: "#000" }}>
-        <StyleInjector />
-        <DroneScene localFrame={droneLocal} totalFrames={droneTotalFrames} />
-
-        {/* Título com FadeUp entrada + FadeOutDown saída — mesmas funções */}
-        <AbsoluteFill style={{ pointerEvents: "none", zIndex: 10 }}>
-          <div style={{
-            position: "absolute", bottom: 130, left: 0, right: 0,
-            display: "flex", flexDirection: "column", alignItems: "center",
-          }}>
-            <FadeUp delay={30}>
-              <FadeOutDown exitBefore={28}>
-                <div style={{
-                  background: "rgba(0,0,0,0.45)", backdropFilter: "blur(6px)",
-                  borderTop: `1px solid rgba(0,255,149,0.3)`,
-                  borderBottom: `1px solid rgba(0,255,149,0.3)`,
-                  padding: "18px 60px", textAlign: "center",
-                }}>
-                  <p style={{ color: "rgba(255,255,255,0.55)", fontFamily: font.body, fontSize: 28, fontWeight: 300, letterSpacing: "0.18em", textTransform: "uppercase", margin: "0 0 6px" }}>
-                    Tecnologia que voa com você
-                  </p>
-                  <img src="/public/assets/images/zenith-logo.png" alt="ZENITH AGRO" style={{ maxWidth: "100%", height: "auto", margin: "10px 0" }} />
-                  <p style={{ color: "rgba(255,255,255,0.4)", fontFamily: font.body, fontSize: 26, fontWeight: 300, letterSpacing: "0.12em", textTransform: "uppercase", margin: "6px 0 0" }}>
-                    @zenith.agricola
-                  </p>
-                </div>
-              </FadeOutDown>
-            </FadeUp>
-          </div>
-        </AbsoluteFill>
-      </AbsoluteFill>
-    </Scene>
-  );
 };

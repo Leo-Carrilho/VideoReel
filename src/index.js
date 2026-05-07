@@ -7,7 +7,7 @@ const RemotionRoot = () => {
     <Composition
       id="ZenithVideo"
       component={Main}
-      durationInFrames={1080}
+      durationInFrames={950}
       fps={30}
       width={1080}
       height={1920}
