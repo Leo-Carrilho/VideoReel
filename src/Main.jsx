@@ -356,7 +356,7 @@ export const Main = () => {
           }} />
 
           <ScaleIn delay={0} config={SPRING_GENTLE}>
-            <FadeOutScale exitBefore={25}>
+            <FadeUp exitBefore={25}>
               <div style={{ textAlign: "center" }}>
                 <h1 style={{
                   color: colors.cyan, fontSize: 120, marginBottom: 0,
@@ -367,7 +367,7 @@ export const Main = () => {
                   animation: "float 4s ease-in-out infinite",
                 }}>ZENITH</h1>
               </div>
-            </FadeOutScale>
+            </FadeUp>
           </ScaleIn>
 
           <FadeUp delay={20} config={SPRING_GENTLE}>
@@ -637,7 +637,7 @@ export const Main = () => {
   if (frame < S5.end) {
     const members = [
       { name: "Leonardo Carrilho", role: "Web/Mobile Developer",       initials: "LC" },
-      { name: "Samuel Vieira",     role: "Full Stack Developer",  initials: "SV" },
+      { name: "Samuel Vieira",     role: "Back/Front Developer",  initials: "SV" },
       { name: "Octávio Augusto",   role: "ML Engineer",          initials: "OA" },
       { name: "Pietro Gimenez",    role: "Web Developer",               initials: "PG" },
     ];
