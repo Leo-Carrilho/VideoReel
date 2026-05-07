@@ -9,6 +9,7 @@ import {
   staticFile,
 } from "remotion";
 
+// ─── PALETA ──────────────────────────────────────────────────────────────────
 const colors = {
   bg: "#023629ff",
   green: "#22c55e",
@@ -18,6 +19,23 @@ const colors = {
   card: "rgba(15,23,42,0.8)",
 };
 
+const font = {
+  display: "'Syne', sans-serif",
+  body: "'DM Sans', sans-serif",
+};
+
+// ─── TIMING CONSTANTS (30 fps) ───────────────────────────────────────────────
+export const SCENES = {
+  S1: { start: 0,    end: 150  }, // 5s  — Intro
+  S2: { start: 150,  end: 330  }, // 6s  — Plantação
+  S3: { start: 330,  end: 510  }, // 6s  — Especialidades
+  S4: { start: 510,  end: 690  }, // 6s  — Diagnóstico
+  S5: { start: 690,  end: 900  }, // 7s  — Nosso Time
+  S6: { start: 900,  end: 1050 }, // 5s  — Localização
+  S7: { start: 1050, end: 1200 }, // 5s  — Final
+};
+
+// ─── CSS GLOBAL ───────────────────────────────────────────────────────────────
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
 
@@ -35,13 +53,18 @@ const globalStyles = `
   }
 
   @keyframes pulseGlow {
-    0%, 100% { opacity: 0.4; }
-    50%       { opacity: 0.7; }
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50%       { opacity: 0.65; transform: scale(1.06); }
   }
 
   @keyframes scanline {
     0%   { transform: translateY(-100%); }
     100% { transform: translateY(100vh); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
   }
 `;
 
@@ -49,13 +72,7 @@ const StyleInjector = () => (
   <style dangerouslySetInnerHTML={{ __html: globalStyles }} />
 );
 
-const font = {
-  display: "'Syne', sans-serif",
-  body: "'DM Sans', sans-serif",
-};
-
-// ─── Contexto de cena ─────────────────────────────────────────────────────────
-// Agora expõe tanto `start` quanto `end` para as funções FadeOut* funcionarem
+// ─── CONTEXT ─────────────────────────────────────────────────────────────────
 const SceneContext = React.createContext({ start: 0, end: 9999 });
 
 const Scene = ({ start, end, children }) => (
@@ -64,137 +81,184 @@ const Scene = ({ start, end, children }) => (
   </SceneContext.Provider>
 );
 
-// ─── FUNÇÕES FADE ORIGINAIS (entrada) ────────────────────────────────────────
+// ─── SPRING CONFIG PRESETS ───────────────────────────────────────────────────
+const SPRING_SMOOTH   = { damping: 18, stiffness: 80,  mass: 1   };
+const SPRING_SNAPPY   = { damping: 22, stiffness: 120, mass: 0.8 };
+const SPRING_GENTLE   = { damping: 28, stiffness: 60,  mass: 1.2 };
 
-const FadeUp = ({ children, delay = 0 }) => {
+// ─── ANIMAÇÃO HELPERS ─────────────────────────────────────────────────────────
+
+/**
+ * Hook que retorna um valor spring de entrada (0→1) relativo à cena.
+ */
+const useEntrance = (delay = 0, config = SPRING_SMOOTH) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const { start } = React.useContext(SceneContext);
-  const localFrame = frame - start;
-  const progress = spring({ frame: localFrame - delay, fps });
-  const opacity = interpolate(progress, [0, 1], [0, 1]);
-  const translateY = interpolate(progress, [0, 1], [60, 0]);
+  return spring({ frame: frame - start - delay, fps, config });
+};
+
+/**
+ * Hook que retorna um valor spring de saída (0→1) relativo ao fim da cena.
+ */
+const useExit = (exitBefore = 20, config = SPRING_SNAPPY) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const { end } = React.useContext(SceneContext);
+  return spring({ frame: exitBefore - (end - frame), fps, config });
+};
+
+// ─── COMPONENTES DE ANIMAÇÃO ──────────────────────────────────────────────────
+
+const FadeUp = ({ children, delay = 0, distance = 55, config }) => {
+  const p = useEntrance(delay, config || SPRING_SMOOTH);
   return (
-    <div style={{ opacity, transform: `translateY(${translateY}px)` }}>
+    <div style={{
+      opacity: interpolate(p, [0, 1], [0, 1]),
+      transform: `translateY(${interpolate(p, [0, 1], [distance, 0])}px)`,
+    }}>
       {children}
     </div>
   );
 };
 
-const FadeDown = ({ children, delay = 0 }) => {
+const FadeDown = ({ children, delay = 0, distance = 55, config }) => {
+  const p = useEntrance(delay, config || SPRING_SMOOTH);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [0, 1]),
+      transform: `translateY(${interpolate(p, [0, 1], [-distance, 0])}px)`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+const FadeRight = ({ children, delay = 0, distance = 55 }) => {
+  const p = useEntrance(delay);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [0, 1]),
+      transform: `translateX(${interpolate(p, [0, 1], [-distance, 0])}px)`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+const FadeLeft = ({ children, delay = 0, distance = 55 }) => {
+  const p = useEntrance(delay);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [0, 1]),
+      transform: `translateX(${interpolate(p, [0, 1], [distance, 0])}px)`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+const ScaleIn = ({ children, delay = 0, config }) => {
+  const p = useEntrance(delay, config || SPRING_GENTLE);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [0, 1]),
+      transform: `scale(${interpolate(p, [0, 1], [0.82, 1])})`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// ─── FADE OUT ─────────────────────────────────────────────────────────────────
+
+const FadeOutDown = ({ children, exitBefore = 22 }) => {
+  const p = useExit(exitBefore);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [1, 0]),
+      transform: `translateY(${interpolate(p, [0, 1], [0, -50])}px)`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+const FadeOutUp = ({ children, exitBefore = 22 }) => {
+  const p = useExit(exitBefore);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [1, 0]),
+      transform: `translateY(${interpolate(p, [0, 1], [0, 50])}px)`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+const FadeOutRight = ({ children, exitBefore = 22 }) => {
+  const p = useExit(exitBefore);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [1, 0]),
+      transform: `translateX(${interpolate(p, [0, 1], [0, 55])}px)`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+const FadeOutLeft = ({ children, exitBefore = 22 }) => {
+  const p = useExit(exitBefore);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [1, 0]),
+      transform: `translateX(${interpolate(p, [0, 1], [0, -55])}px)`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+const FadeOutScale = ({ children, exitBefore = 22 }) => {
+  const p = useExit(exitBefore);
+  return (
+    <div style={{
+      opacity: interpolate(p, [0, 1], [1, 0]),
+      transform: `scale(${interpolate(p, [0, 1], [1, 0.9])})`,
+    }}>
+      {children}
+    </div>
+  );
+};
+
+// ─── CARD STAGGERED — helper para cards que entram um por um ──────────────────
+/**
+ * Cada card entra individualmente após `delay` frames desde o início da cena.
+ * Nunca sai sozinho — mantém-se até o FadeOut da cena pai.
+ */
+const StaggerCard = ({ children, delay = 0, direction = "up", distance = 50 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const { start } = React.useContext(SceneContext);
-  const localFrame = frame - start;
-  const progress = spring({ frame: localFrame - delay, fps });
-  const opacity = interpolate(progress, [0, 1], [0, 1]);
-  const translateY = interpolate(progress, [0, 1], [-60, 0]);
+  const localFrame = frame - start - delay;
+  const p = spring({ frame: localFrame, fps, config: SPRING_SMOOTH });
+  const opacity = interpolate(p, [0, 1], [0, 1], { extrapolateRight: "clamp" });
+
+  let transform = "";
+  if (direction === "up")    transform = `translateY(${interpolate(p, [0,1],[distance,0])}px)`;
+  if (direction === "right") transform = `translateX(${interpolate(p, [0,1],[-distance,0])}px)`;
+  if (direction === "scale") transform = `scale(${interpolate(p, [0,1],[0.85,1])})`;
+
   return (
-    <div style={{ opacity, transform: `translateY(${translateY}px)` }}>
+    <div style={{ opacity, transform }}>
       {children}
     </div>
   );
 };
 
-const FadeRight = ({ children, delay = 0 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const { start } = React.useContext(SceneContext);
-  const localFrame = frame - start;
-  const progress = spring({ frame: localFrame - delay, fps });
-  const opacity = interpolate(progress, [0, 1], [0, 1]);
-  const translateX = interpolate(progress, [0, 1], [-60, 0]);
-  return (
-    <div style={{ opacity, transform: `translateX(${translateX}px)` }}>
-      {children}
-    </div>
-  );
-};
+// ─── LAYOUT PRIMITIVOS ────────────────────────────────────────────────────────
 
-const FadeLeft = ({ children, delay = 0 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const { start } = React.useContext(SceneContext);
-  const localFrame = frame - start;
-  const progress = spring({ frame: localFrame - delay, fps });
-  const opacity = interpolate(progress, [0, 1], [0, 1]);
-  const translateX = interpolate(progress, [0, 1], [60, 0]);
-  return (
-    <div style={{ opacity, transform: `translateX(${translateX}px)` }}>
-      {children}
-    </div>
-  );
-};
-
-// ─── FUNÇÕES FADE DE SAÍDA ────────────────────────────────────────────────────
-// Mesma matemática das originais, mas o `frame` é regressivo:
-// conta a partir do momento em que faltam `exitBefore` frames pro fim da cena.
-// FadeOutDown  → conteúdo sobe ao sair  (espelho do FadeUp)
-// FadeOutUp    → conteúdo desce ao sair (espelho do FadeDown)
-// FadeOutRight → conteúdo vai p/ direita ao sair (espelho do FadeLeft)
-// FadeOutLeft  → conteúdo vai p/ esquerda ao sair (espelho do FadeRight)
-
-const FadeOutDown = ({ children, exitBefore = 20 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const { end } = React.useContext(SceneContext);
-  const reverseFrame = exitBefore - (end - frame);
-  const progress = spring({ frame: reverseFrame, fps });
-  const opacity = interpolate(progress, [0, 1], [1, 0]);
-  const translateY = interpolate(progress, [0, 1], [0, -60]);
-  return (
-    <div style={{ opacity, transform: `translateY(${translateY}px)` }}>
-      {children}
-    </div>
-  );
-};
-
-const FadeOutUp = ({ children, exitBefore = 20 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const { end } = React.useContext(SceneContext);
-  const reverseFrame = exitBefore - (end - frame);
-  const progress = spring({ frame: reverseFrame, fps });
-  const opacity = interpolate(progress, [0, 1], [1, 0]);
-  const translateY = interpolate(progress, [0, 1], [0, 60]);
-  return (
-    <div style={{ opacity, transform: `translateY(${translateY}px)` }}>
-      {children}
-    </div>
-  );
-};
-
-const FadeOutRight = ({ children, exitBefore = 20 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const { end } = React.useContext(SceneContext);
-  const reverseFrame = exitBefore - (end - frame);
-  const progress = spring({ frame: reverseFrame, fps });
-  const opacity = interpolate(progress, [0, 1], [1, 0]);
-  const translateX = interpolate(progress, [0, 1], [0, 60]);
-  return (
-    <div style={{ opacity, transform: `translateX(${translateX}px)` }}>
-      {children}
-    </div>
-  );
-};
-
-const FadeOutLeft = ({ children, exitBefore = 20 }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const { end } = React.useContext(SceneContext);
-  const reverseFrame = exitBefore - (end - frame);
-  const progress = spring({ frame: reverseFrame, fps });
-  const opacity = interpolate(progress, [0, 1], [1, 0]);
-  const translateX = interpolate(progress, [0, 1], [0, -60]);
-  return (
-    <div style={{ opacity, transform: `translateX(${translateX}px)` }}>
-      {children}
-    </div>
-  );
-};
-
-// ─── Screen premium ───────────────────────────────────────────────────────────
 const Screen = ({ children }) => (
   <AbsoluteFill
     style={{
@@ -213,12 +277,14 @@ const Screen = ({ children }) => (
       overflow: "hidden",
     }}
   >
+    {/* Noise grain overlay */}
     <div style={{
       position: "absolute", inset: 0,
       backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")`,
       backgroundSize: "180px 180px", opacity: 0.35, pointerEvents: "none", zIndex: 0,
       animation: "subtleGrain 0.8s steps(1) infinite", mixBlendMode: "overlay",
     }} />
+    {/* Scanline */}
     <div style={{
       position: "absolute", left: 0, right: 0, height: "2px",
       background: "linear-gradient(90deg, transparent, rgba(0,255,149,0.08), transparent)",
@@ -235,7 +301,7 @@ const Screen = ({ children }) => (
 
 const PremiumCard = ({ children, style = {} }) => (
   <div style={{
-    background: "linear-gradient(135deg, rgba(0, 141, 82, 1) 0%, rgba(9, 184, 140, 0.5) 50%, rgba(2,54,41,0.5) 100%)",
+    background: "linear-gradient(135deg, rgba(0,141,82,1) 0%, rgba(9,184,140,0.5) 50%, rgba(2,54,41,0.5) 100%)",
     backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
     border: "1px solid rgba(0,255,149,0.15)", borderRadius: 16, padding: "10px 40px",
     boxShadow: "0 4px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(0,255,149,0.1)",
@@ -270,52 +336,47 @@ const Divider = () => (
 );
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
-//
-// Mapa de cenas (30fps):
-//   Cena 1 : 0   → 120   Cena 2 : 120 → 240   Cena 3 : 240 → 360
-//   Cena 4 : 360 → 480   Cena 5 : 480 → 720   Cena 6 : 720 → 820
-//   Cena 7 : 820 → 940
-//
-// Transições: cada elemento tem FadeXxx na entrada + FadeOutXxx na saída.
-// As funções FadeOut* usam `end` do SceneContext para o frame regressivo.
-
 export const Main = () => {
   const frame = useCurrentFrame();
+  const { S1, S2, S3, S4, S5, S6, S7 } = SCENES;
 
-  // ── CENA 1 ─────────────────────────────────────────────────────────────────
-  if (frame < 120)
+  // ── CENA 1 — Intro ZENITH ─────────────────────────────────────────────────
+  if (frame < S1.end)
     return (
-      <Scene start={0} end={120}>
+      <Scene start={S1.start} end={S1.end}>
         <Screen>
           <StyleInjector />
+
+          {/* Glowing orb de fundo */}
           <div style={{
-            position: "absolute", width: 600, height: 600, borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(0,255,149,0.07) 0%, transparent 70%)",
+            position: "absolute", width: 700, height: 700, borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(0,255,149,0.08) 0%, transparent 70%)",
             top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            pointerEvents: "none", animation: "pulseGlow 3s ease-in-out infinite",
+            pointerEvents: "none", animation: "pulseGlow 3.5s ease-in-out infinite",
           }} />
 
-          <FadeUp delay={20}>
-            <FadeOutDown exitBefore={22}>
+          <ScaleIn delay={0} config={SPRING_GENTLE}>
+            <FadeOutScale exitBefore={25}>
               <div style={{ textAlign: "center" }}>
                 <h1 style={{
-                  color: colors.cyan, fontSize: 100, marginBottom: 0,
+                  color: colors.cyan, fontSize: 120, marginBottom: 0,
                   fontFamily: font.display, fontWeight: 800, letterSpacing: "-0.04em",
                   lineHeight: 0.9,
-                  textShadow: `0 0 80px rgba(0,255,149,0.35), 0 0 160px rgba(0,255,149,0.15)`,
+                  textShadow: `0 0 80px rgba(0,255,149,0.4), 0 0 160px rgba(0,255,149,0.18)`,
                   WebkitTextStroke: "1px rgba(0,255,149,0.4)",
+                  animation: "float 4s ease-in-out infinite",
                 }}>ZENITH</h1>
               </div>
-            </FadeOutDown>
-          </FadeUp>
+            </FadeOutScale>
+          </ScaleIn>
 
-          <FadeUp delay={40}>
-            <FadeOutUp exitBefore={18}>
+          <FadeUp delay={20} config={SPRING_GENTLE}>
+            <FadeOutUp exitBefore={22}>
               <Divider />
               <p style={{
-                color: "rgba(250, 252, 255, 0.75)", fontSize: 42, fontFamily: font.body,
+                color: "rgba(250,252,255,0.75)", fontSize: 42, fontFamily: font.body,
                 fontWeight: 300, textAlign: "center", letterSpacing: "0.01em",
-                marginTop: 16, lineHeight: 1.4,
+                marginTop: 18, lineHeight: 1.4,
               }}>
                 A sua precisão agrícola{" "}
                 <em style={{ color: colors.cyan, fontStyle: "normal", fontWeight: 400 }}>
@@ -324,26 +385,41 @@ export const Main = () => {
               </p>
             </FadeOutUp>
           </FadeUp>
+
+          <FadeUp delay={40} config={SPRING_GENTLE}>
+            <FadeOutUp exitBefore={18}>
+              <p style={{
+                color: colors.cyan, fontFamily: font.body,
+                fontSize: 28, fontWeight: 300, letterSpacing: "0.22em",
+                textTransform: "uppercase", textAlign: "center", marginTop: 8,
+              }}>
+                Tecnologia · Precisão · Resultado
+              </p>
+            </FadeOutUp>
+          </FadeUp>
         </Screen>
       </Scene>
     );
 
-  // ── CENA 2 ─────────────────────────────────────────────────────────────────
-  if (frame < 240)
+  // ── CENA 2 — Plantação ────────────────────────────────────────────────────
+  if (frame < S2.end)
     return (
-      <Scene start={120} end={240}>
+      <Scene start={S2.start} end={S2.end}>
         <Screen>
           <StyleInjector />
 
-          <FadeLeft>
+          <FadeLeft delay={0}>
             <FadeOutRight exitBefore={22}>
               <h2 style={{
                 color: colors.text, fontSize: 72, textAlign: "center",
-                marginBottom: 200, fontFamily: font.display, fontWeight: 700,
+                marginBottom: 28, fontFamily: font.display, fontWeight: 700,
                 lineHeight: 1.15, letterSpacing: "-0.03em",
               }}>
                 Cuidamos da sua{" "}
-                <span style={{ color: colors.cyan, fontSize: 96, display: "block", textShadow: `0 0 40px rgba(0,255,149,0.4)`, fontWeight: 800 }}>
+                <span style={{
+                  color: colors.cyan, fontSize: 96, display: "block",
+                  textShadow: `0 0 40px rgba(0,255,149,0.4)`, fontWeight: 800,
+                }}>
                   Plantação
                 </span>
                 <Divider />
@@ -352,50 +428,70 @@ export const Main = () => {
           </FadeLeft>
 
           {[
-            { text: "Reduzir perdas na lavoura",          delay: 0  },
-            { text: "Aumentar produtividade sustentável", delay: 10 },
-            { text: "Economizar insumos",                 delay: 20 },
-            { text: "Tomar decisões com dados reais",     delay: 30 },
+            { text: "Reduzir perdas na lavoura",          delay: 8  },
+            { text: "Aumentar produtividade sustentável", delay: 20 },
+            { text: "Economizar insumos",                 delay: 32 },
+            { text: "Tomar decisões com dados reais",     delay: 44 },
           ].map(({ text, delay }, i) => (
-            <PremiumCard key={i} style={{ width: "90%" }}>
-              <FadeUp delay={delay}>
-                <FadeOutLeft exitBefore={18}>
+            <StaggerCard key={i} delay={delay} direction="right" distance={60}>
+              <FadeOutLeft exitBefore={18}>
+                <PremiumCard
+                    style={{
+                      width: 980, // todos ficam exatamente com a mesma largura
+                      minHeight: 105,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      borderRadius: 30,
+                      padding: "0 34px",
+                      background:
+                        "linear-gradient(150deg, rgba(8, 163, 96, 0.85) 30%, rgba(8, 84, 46, 0.95) 100%)",
+                      border: "1px solid rgba(0,255,149,0.18)",
+                      backdropFilter: "blur(18px)",
+                      boxShadow:
+                        "0 10px 40px rgba(0,0,0,0.35), 0 0 25px rgba(0,255,149,0.08)",
+                    }}
+                  >
                   <p style={{
-                    display: "flex", alignItems: "center", gap: 40, margin: "50px 0",
+                    display: "flex", alignItems: "center", gap: 40, margin: "46px 0",
                     color: colors.text, fontFamily: font.body, fontSize: 45,
                     fontWeight: 500, lineHeight: i === 3 ? 2 : 1.3, letterSpacing: "0.3px",
-                    borderBottom: i < 3 ? `${i === 3 ? 2 : 1}px solid rgba(0,255,149,0.12)` : "none",
+                    borderBottom: i < 3 ? `1px solid rgba(0,255,149,0.12)` : "none",
                     paddingBottom: i < 3 ? 14 : 0,
                   }}>
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: colors.cyan, flexShrink: 0, boxShadow: `0 0 10px ${colors.cyan}` }} />
+                    <span style={{
+                      width: 10, height: 10, borderRadius: "50%",
+                      background: colors.cyan, flexShrink: 0,
+                      boxShadow: `0 0 15px ${colors.cyan}`,
+                    }} />
                     {text}
                   </p>
-                </FadeOutLeft>
-              </FadeUp>
-            </PremiumCard>
+                </PremiumCard>
+              </FadeOutLeft>
+            </StaggerCard>
           ))}
         </Screen>
       </Scene>
     );
 
-  // ── CENA 3 ─────────────────────────────────────────────────────────────────
-  if (frame < 360)
+  // ── CENA 3 — Especialidades ───────────────────────────────────────────────
+  if (frame < S3.end)
     return (
-      <Scene start={240} end={360}>
+      <Scene start={S3.start} end={S3.end}>
         <Screen>
           <StyleInjector />
 
-          <FadeDown>
+          <FadeDown delay={0}>
             <FadeOutDown exitBefore={22}>
               <SectionTag>Especialidades</SectionTag>
             </FadeOutDown>
           </FadeDown>
 
-          <FadeUp delay={5}>
+          <FadeUp delay={6}>
             <FadeOutUp exitBefore={22}>
               <h2 style={{
                 color: colors.cyan, fontFamily: font.display, fontWeight: 800,
-                fontSize: 82, letterSpacing: "-0.02em", margin: "0 0 80px",
+                fontSize: 82, letterSpacing: "-0.02em", margin: "0 0 60px",
                 textShadow: "0 0 30px rgba(34,197,94,0.3)",
               }}>O que fazemos</h2>
             </FadeOutUp>
@@ -410,24 +506,24 @@ export const Main = () => {
               { label: "Detecção de doenças",       icon: "⬟", span: true  },
             ].map(({ label, icon, span }, i) => (
               <div key={i} style={{ gridColumn: span ? "1 / -1" : undefined }}>
-                <FadeUp delay={i * 10}>
+                <StaggerCard delay={i * 14 + 12} direction="up" distance={40}>
                   <FadeOutUp exitBefore={18}>
                     <div style={{
                       background: "linear-gradient(135deg, rgba(0,255,149,0.05), rgba(2,54,41,0.4))",
-                      border: "1px solid rgba(0, 243, 142, 0.53)",
-                      borderLeft: `3px solid rgba(0, 243, 142, 1)`,
-                      borderRadius: 12, padding: span ? "50px 28px" : "50px 18px",
+                      border: "1px solid rgba(0,243,142,0.53)",
+                      borderLeft: `3px solid rgba(0,243,142,1)`,
+                      borderRadius: 12, padding: span ? "46px 28px" : "46px 18px",
                       display: "flex", flexDirection: span ? "row" : "column",
                       alignItems: span ? "center" : "flex-start", gap: span ? 16 : 10,
                       backdropFilter: "blur(8px)", boxShadow: "0 2px 16px rgba(0,0,0,0.3)",
-                      boxSizing: "border-box", width: "100%", height: "100%",
+                      boxSizing: "border-box", width: "100%",
                       marginBottom: span ? 0 : 14,
                     }}>
                       <span style={{ color: colors.cyan, fontSize: 28, opacity: 0.85, fontFamily: "monospace", flexShrink: 0 }}>{icon}</span>
                       <span style={{ color: colors.text, fontFamily: font.body, fontSize: 36, fontWeight: 400, lineHeight: 1.3 }}>{label}</span>
                     </div>
                   </FadeOutUp>
-                </FadeUp>
+                </StaggerCard>
               </div>
             ))}
           </div>
@@ -435,12 +531,11 @@ export const Main = () => {
       </Scene>
     );
 
-  // ── CENA 4 ─────────────────────────────────────────────────────────────────
-  if (frame < 480) {
-    const CENA4_START  = 360;
-    const localFrame4  = frame - CENA4_START;
-    const count        = Math.min(5, Math.floor(localFrame4 / 2) + 1);
-    const diseases     = [
+  // ── CENA 4 — Diagnóstico (cards escalonados) ─────────────────────────────
+  if (frame < S4.end) {
+    const localFrame = frame - S4.start;
+    const count = Math.min(5, Math.floor(localFrame / 4) + 1);
+    const diseases = [
       { name: "Ferrugem Asiática", severity: "Alta",    color: "#FF6B35" },
       { name: "Mancha Bacteriana", severity: "Média",   color: "#FFA726" },
       { name: "Mancha-alvo",       severity: "Média",   color: "#FF9800" },
@@ -448,212 +543,324 @@ export const Main = () => {
       { name: "Ataque de Lagarta", severity: "Baixa",   color: "#FFCA28" },
       { name: "Saudável",          severity: "Nenhuma", color: "#66BB6A" },
     ];
+
     return (
-      <Scene start={CENA4_START} end={480}>
+      <Scene start={S4.start} end={S4.end}>
         <Screen>
           <StyleInjector />
 
-          <FadeDown>
+          <FadeDown delay={0}>
             <FadeOutDown exitBefore={22}>
               <SectionTag>Diagnóstico</SectionTag>
             </FadeOutDown>
           </FadeDown>
 
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", padding: "30px 20px", gap: 24 }}>
-
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            justifyContent: "center", width: "100%", padding: "20px 20px", gap: 20,
+          }}>
+            {/* Contador central */}
             <FadeUp delay={0}>
               <FadeOutUp exitBefore={22}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-                  <div style={{ position: "relative", width: 260, height: 260, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ position: "absolute", width: 250, height: 250, borderRadius: "50%", border: "2px solid rgba(0,255,149,0.06)" }} />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    position: "relative", width: 240, height: 240,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <div style={{
+                      position: "absolute", width: 230, height: 230, borderRadius: "50%",
+                      border: "2px solid rgba(0,255,149,0.1)",
+                    }} />
+                    <div style={{
+                      position: "absolute", width: 190, height: 190, borderRadius: "50%",
+                      border: "1px solid rgba(0,255,149,0.05)",
+                    }} />
                     <h1 style={{
-                      position: "relative", color: colors.cyan, fontSize: 140,
+                      position: "relative", color: colors.cyan, fontSize: 130,
                       fontFamily: "monospace", fontWeight: 700, letterSpacing: "-0.06em",
                       lineHeight: 1, margin: 0,
-                      textShadow: `0 0 30px rgba(0,255,149,0.9), 0 0 60px rgba(0,255,149,0.5), 0 0 90px rgba(0,255,149,0.3), 0 0 120px rgba(0,255,149,0.15)`,
+                      textShadow: `0 0 30px rgba(0,255,149,0.9), 0 0 60px rgba(0,255,149,0.5),
+                                   0 0 90px rgba(0,255,149,0.3), 0 0 120px rgba(0,255,149,0.15)`,
                     }}>{count}</h1>
                   </div>
                   <div style={{ textAlign: "center" }}>
-                    <p style={{ color: colors.text, fontFamily: font.display, fontSize: 56, fontWeight: 700, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.1 }}>Detecção</p>
-                    <p style={{ color: colors.text, fontFamily: font.display, fontSize: 56, fontWeight: 700, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.1 }}>de pragas e doenças disponíveis</p>
-                    <p style={{ color: colors.cyan, fontFamily: font.display, fontWeight: 800, fontSize: 72, letterSpacing: "-0.03em", margin: "0 0 8px", textShadow: "0 0 30px rgba(34,197,94,0.3)" }}>pela Zenith</p>
+                    <p style={{ color: colors.text, fontFamily: font.display, fontSize: 50, fontWeight: 700, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.1 }}>Detecção</p>
+                    <p style={{ color: colors.text, fontFamily: font.display, fontSize: 44, fontWeight: 700, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.1 }}>de pragas e doenças disponíveis</p>
+                    <p style={{ color: colors.cyan, fontFamily: font.display, fontWeight: 800, fontSize: 64, letterSpacing: "-0.03em", margin: "4px 0 0", textShadow: "0 0 30px rgba(34,197,94,0.3)" }}>pela Zenith</p>
                   </div>
                 </div>
               </FadeOutUp>
             </FadeUp>
 
-            <br /><br />
-
-            <FadeUp delay={8}>
-              <FadeOutUp exitBefore={18}>
-                <div style={{display: "flex",flexDirection: "column",gap: 16,width: "98%",maxWidth: 760,}}>
-                  {diseases.map((disease, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "28px 34px",
-                        minHeight: 110,
-                        borderRadius: 20,
-                        background: "rgba(13, 36, 31, 0.85)",
-                        backdropFilter: "blur(16px)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        boxShadow:
-                          "0 8px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 0 1px rgba(0,255,149,0.04)",
-                      }}
-                    >
+            {/* Cards escalonados — cada um entra separado */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 18, width: 820 }}>
+              {diseases.map((disease, i) => (
+                <StaggerCard key={i} delay={i * 16 + 10} direction="right" distance={70}>
+                  <FadeOutUp exitBefore={16}>
+                    <div style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "22px 32px", minHeight: 96, borderRadius: 20,
+                      background: "rgba(13,36,31,0.85)", backdropFilter: "blur(16px)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      boxShadow: `0 8px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 0 1px rgba(0,255,149,0.04)`,
+                    }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                        <span style={{ color: "#E2E8F0", fontFamily: font.body, fontSize: 32, fontWeight: 500, letterSpacing: "0.01em", lineHeight: 1.2 }}>{disease.name}</span>
+                        <span style={{
+                          width: 8, height: 8, borderRadius: "50%",
+                          background: disease.color, flexShrink: 0,
+                          boxShadow: `0 0 8px ${disease.color}80`,
+                        }} />
+                        <span style={{
+                          color: "#E2E8F0", fontFamily: font.body, fontSize: 32,
+                          fontWeight: 500, letterSpacing: "0.01em", lineHeight: 1.2,
+                        }}>{disease.name}</span>
                       </div>
                       <span style={{
-                        padding: "8px 18px", borderRadius: 999,
+                        padding: "7px 16px", borderRadius: 999,
                         background: `${disease.color}15`, border: `1.5px solid ${disease.color}50`,
-                        color: disease.color, fontFamily: font.body, fontSize: 26, fontWeight: 600,
-                        letterSpacing: "0.05em", boxShadow: `0 0 16px ${disease.color}20, inset 0 0 12px ${disease.color}08`,
+                        color: disease.color, fontFamily: font.body, fontSize: 24, fontWeight: 600,
+                        letterSpacing: "0.05em",
+                        boxShadow: `0 0 16px ${disease.color}20, inset 0 0 12px ${disease.color}08`,
                       }}>{disease.severity}</span>
                     </div>
-                  ))}
-                </div>
-              </FadeOutUp>
-            </FadeUp>
+                  </FadeOutUp>
+                </StaggerCard>
+              ))}
+            </div>
           </div>
         </Screen>
       </Scene>
     );
   }
 
-  // ── CENA 5 ─────────────────────────────────────────────────────────────────
-  if (frame < 720)
+  // ── CENA 5 — Nosso Time (cards escalonados em grid) ──────────────────────
+  if (frame < S5.end) {
+    const members = [
+      { name: "Leonardo Carrilho", role: "Web/Mobile Developer",       initials: "LC" },
+      { name: "Samuel Vieira",     role: "Full Stack Developer",  initials: "SV" },
+      { name: "Octávio Augusto",   role: "ML Engineer",          initials: "OA" },
+      { name: "Pietro Gimenez",    role: "Web Developer",               initials: "PG" },
+    ];
+
     return (
-      <Scene start={480} end={720}>
+      <Scene start={S5.start} end={S5.end}>
         <Screen>
           <StyleInjector />
 
-          <FadeDown>
+          <FadeDown delay={0}>
             <FadeOutDown exitBefore={22}>
               <SectionTag>Nosso Time</SectionTag>
             </FadeOutDown>
           </FadeDown>
 
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", padding: "30px 20px", gap: 28 }}>
-
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            justifyContent: "center", width: "100%", padding: "10px 10px", gap: 8,
+          }}>
             <FadeUp delay={0}>
               <FadeOutUp exitBefore={22}>
                 <div style={{ textAlign: "center" }}>
                   <h2 style={{ color: colors.text, fontFamily: font.display, fontWeight: 700, fontSize: 64, letterSpacing: "-0.03em", margin: "0 0 0", lineHeight: 1.1 }}>Nossos</h2>
-                  <h2 style={{ color: colors.cyan, fontFamily: font.display, fontWeight: 700, fontSize: 64, letterSpacing: "-0.03em", margin: "0 0 10px", lineHeight: 1.1, textShadow: `0 0 30px rgba(0,255,149,0.5), 0 0 60px rgba(0,255,149,0.2)` }}>Especialistas</h2>
-                  <div style={{ width: "100%", height: 2, background: "linear-gradient(90deg, transparent, rgba(0,255,149,0.4), transparent)", margin: "0 0 100px" }} />
+                  <h2 style={{
+                    color: colors.cyan, fontFamily: font.display, fontWeight: 700,
+                    fontSize: 64, letterSpacing: "-0.03em", margin: "0 0 10px", lineHeight: 1.1,
+                    textShadow: `0 0 30px rgba(0,255,149,0.5), 0 0 60px rgba(0,255,149,0.2)`,
+                  }}>Especialistas</h2>
+                  <div style={{
+                    width: "100%", height: 2,
+                    background: "linear-gradient(90deg, transparent, rgba(0,255,149,0.4), transparent)",
+                    margin: "0 0 30px",
+                  }} />
                 </div>
               </FadeOutUp>
             </FadeUp>
 
-            <FadeUp delay={5}>
-              <FadeOutUp exitBefore={22}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, width: "98%", maxWidth: 620 }}>
-                  {[
-                    { name: "Leonardo Carrilho", role: "Web/Mobile Developer",      initials: "LC" },
-                    { name: "Samuel Vieira",      role: "Backend/Frontend Developer", initials: "SV" },
-                    { name: "Octávio Augusto",    role: "ML/Prompt Engineer",         initials: "OA" },
-                    { name: "Pietro Gimenez",     role: "Web Developer",              initials: "PG" },
-                  ].map((member, i) => (
-                    <div key={i} style={{
+            {/* Grid com cards escalonados */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24,
+              width: "100%", padding: "0 10px",
+            }}>
+              {members.map((member, i) => (
+                <StaggerCard key={i} delay={i * 18 + 10} direction="up" distance={55}>
+                  <FadeOutScale exitBefore={20}>
+                    <div style={{
                       background: "linear-gradient(145deg, rgba(0,255,149,0.05) 0%, rgba(2,54,41,0.4) 100%)",
-                      border: "1px solid rgba(0,255,149,0.1)", borderRadius: 18, padding: "72px 58px",
+                      border: "1px solid rgba(0,255,149,0.1)", borderRadius: 24,
+                      padding: "80px 40px", minHeight: 380, width: "100%",
                       backdropFilter: "blur(12px)",
-                      boxShadow: "0 6px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03), 0 0 0 1px rgba(0,255,149,0.03)",
-                      display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
-                      transition: "all 0.3s ease",
+                      boxShadow: "0 6px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)",
+                      display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center",
+                      gap: 20, boxSizing: "border-box",
                     }}>
                       <div style={{
-                        width: 67, height: 67, borderRadius: "50%",
+                        width: 72, height: 72, borderRadius: "50%",
                         background: `linear-gradient(135deg, ${colors.cyan}30, rgba(0,255,149,0.08))`,
                         border: `2px solid ${colors.cyan}40`,
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        boxShadow: `0 0 20px rgba(0,255,149,0.2), inset 0 0 12px rgba(0,255,149,0.1)`,
+                        boxShadow: `0 0 22px rgba(0,255,149,0.2), inset 0 0 12px rgba(0,255,149,0.1)`,
                       }}>
-                        <span style={{ fontSize: 22, color: colors.cyan, fontFamily: font.display, fontWeight: 700, letterSpacing: "0.02em", textShadow: "0 0 8px rgba(0,255,149,0.4)" }}>{member.initials}</span>
+                        <span style={{
+                          fontSize: 24, color: colors.cyan, fontFamily: font.display,
+                          fontWeight: 700, letterSpacing: "0.02em",
+                          textShadow: "0 0 8px rgba(0,255,149,0.4)",
+                        }}>{member.initials}</span>
                       </div>
-                      <span style={{ color: "#E2E8F0", fontFamily: font.body, fontSize: 28, fontWeight: 500, letterSpacing: "0.01em", lineHeight: 1.2, textAlign: "center" }}>{member.name}</span>
-                      <span style={{ color: "rgba(0,255,149,0.5)", fontFamily: font.body, fontSize: 20, fontWeight: 300, letterSpacing: "0.04em", textAlign: "center", lineHeight: 1 }}>{member.role}</span>
+                      <span style={{
+                        color: "#E2E8F0", fontFamily: font.body, fontSize: 35, fontWeight: 500,
+                        letterSpacing: "0.01em", lineHeight: 1.2, textAlign: "center", marginTop: 10,
+                      }}>{member.name}</span>
+                      <span style={{
+                        color:colors.cyan, fontFamily: font.display, fontSize: 30,
+                        fontWeight: 700, letterSpacing: "0.04em", textAlign: "center", lineHeight: 1,
+                      }}>{member.role}</span>
                     </div>
-                  ))}
-                </div>
-              </FadeOutUp>
-            </FadeUp>
+                  </FadeOutScale>
+                </StaggerCard>
+              ))}
+            </div>
           </div>
         </Screen>
       </Scene>
     );
+  }
 
-  // ── CENA 6 ─────────────────────────────────────────────────────────────────
-  if (frame < 820)
+  // ── CENA 6 — Localização ─────────────────────────────────────────────────
+  if (frame < S6.end)
     return (
-      <Scene start={720} end={820}>
+      <Scene start={S6.start} end={S6.end}>
         <Screen>
           <StyleInjector />
 
-          <FadeDown>
+          <FadeDown delay={0}>
             <FadeOutDown exitBefore={22}>
               <SectionTag>Localização</SectionTag>
             </FadeOutDown>
           </FadeDown>
 
-          <FadeUp delay={5}>
+          <FadeUp delay={8}>
             <FadeOutUp exitBefore={22}>
-              <h2 style={{ color: colors.cyan, fontFamily: font.display, fontWeight: 800, fontSize: 72, letterSpacing: "-0.03em", margin: "0 0 8px", textShadow: "0 0 30px rgba(34,197,94,0.3)" }}>
+              <h2 style={{
+                color: colors.cyan, fontFamily: font.display, fontWeight: 800,
+                fontSize: 72, letterSpacing: "-0.03em", margin: "0 0 8px",
+                textShadow: "0 0 30px rgba(34,197,94,0.3)",
+              }}>
                 Onde estamos
               </h2>
             </FadeOutUp>
           </FadeUp>
 
-          <Divider />
+          <StaggerCard delay={18} direction="up" distance={40}>
+            <FadeOutUp exitBefore={22}>
+              <Divider />
+            </FadeOutUp>
+          </StaggerCard>
 
-          <FadeUp delay={15}>
+          <StaggerCard delay={28} direction="up" distance={50}>
             <FadeOutUp exitBefore={18}>
-              <p style={{ color: "rgba(226,232,240,0.7)", fontFamily: font.body, fontSize: 36, fontWeight: 300, textAlign: "center", letterSpacing: "0.01em", marginTop: 12 }}>
+              <p style={{
+                color: "rgba(226,232,240,0.7)", fontFamily: font.body, fontSize: 36,
+                fontWeight: 300, textAlign: "center", letterSpacing: "0.01em", marginTop: 14,
+              }}>
                 Estamos localizados em{" "}
                 <span style={{ color: colors.cyan, fontWeight: 500 }}>Americana - SP</span>
               </p>
-              <p style={{ color: "rgba(226,232,240,0.5)", fontFamily: font.body, fontSize: 32, fontWeight: 300, textAlign: "center", letterSpacing: "0.04em", textTransform: "uppercase", marginTop: 4 }}>
+            </FadeOutUp>
+          </StaggerCard>
+
+          <StaggerCard delay={44} direction="up" distance={50}>
+            <FadeOutUp exitBefore={18}>
+              <p style={{
+                color: "rgba(226,232,240,0.5)", fontFamily: font.body, fontSize: 32,
+                fontWeight: 300, textAlign: "center", letterSpacing: "0.04em",
+                textTransform: "uppercase", marginTop: 4,
+              }}>
                 Em breve, expandindo para todo o estado
               </p>
             </FadeOutUp>
-          </FadeUp>
+          </StaggerCard>
+
+          {/* Detalhe visual extra */}
+          <StaggerCard delay={60} direction="scale" distance={0}>
+            <FadeOutScale exitBefore={18}>
+              <div style={{
+                marginTop: 32, padding: "18px 48px", borderRadius: 999,
+                border: "1px solid rgba(0,255,149,0.2)",
+                background: "rgba(0,255,149,0.05)",
+                display: "flex", alignItems: "center", gap: 16,
+              }}>
+                <span style={{
+                  color: "rgba(226,232,240,0.6)", fontFamily: font.body,
+                  fontSize: 28, fontWeight: 300, letterSpacing: "0.06em",
+                }}>Estado de São Paulo · Brasil</span>
+              </div>
+            </FadeOutScale>
+          </StaggerCard>
         </Screen>
       </Scene>
     );
 
-  // ── CENA 7 — Final ZENITH ──────────────────────────────────────────────────
-  if (frame < 940)
+  // ── CENA 7 — Final ZENITH ─────────────────────────────────────────────────
+  if (frame < S7.end)
     return (
-      <Scene start={820} end={940}>
+      <Scene start={S7.start} end={S7.end}>
         <Screen>
           <StyleInjector />
+
+          {/* Orb pulsante de fundo */}
           <div style={{
-            position: "absolute", width: 500, height: 500, borderRadius: "50%",
+            position: "absolute", width: 550, height: 550, borderRadius: "50%",
             background: "radial-gradient(circle, rgba(0,255,149,0.1) 0%, transparent 65%)",
             animation: "pulseGlow 2.5s ease-in-out infinite", pointerEvents: "none",
           }} />
 
-          <FadeUp delay={0}>
+          <ScaleIn delay={0} config={SPRING_GENTLE}>
+            <FadeOutScale exitBefore={24}>
+              <Img
+                src={staticFile("/assets/image/img_logo.jpeg")}
+                alt="ZENITH AGRO"
+                style={{
+                  maxWidth: "100%", height: "auto", marginBottom: 24,
+                }}
+              />
+            </FadeOutScale>
+          </ScaleIn>
+
+          <FadeUp delay={18}>
             <FadeOutUp exitBefore={22}>
-            <Img src={staticFile("/assets/image/img_logo.jpeg")} alt="ZENITH AGRO" style={{ maxWidth: "100%", height: "auto", marginBottom: 24, filter: "drop-shadow(0 0 10px rgba(0,255,149,0.5))" }} />
+              <Divider />
             </FadeOutUp>
           </FadeUp>
 
-          <Divider />
-
-          <FadeUp delay={20}>
+          <FadeUp delay={30}>
             <FadeOutDown exitBefore={22}>
-              <p style={{ color: "rgba(226,232,240,0.55)", fontFamily: font.body, fontSize: 36, fontWeight: 300, letterSpacing: "0.12em", textTransform: "uppercase", position: "relative" }}>
+              <p style={{
+                color: "rgba(226,232,240,0.55)", fontFamily: font.body,
+                fontSize: 36, fontWeight: 300, letterSpacing: "0.12em",
+                textTransform: "uppercase",
+              }}>
                 Acesse:{" "}
-                <span style={{ color: colors.cyan, fontWeight: 500, letterSpacing: "0.06em" }}>@zenith.agricola</span>
+                <span style={{ color: colors.cyan, fontWeight: 500, letterSpacing: "0.06em" }}>
+                  @zenith.agricola
+                </span>
               </p>
             </FadeOutDown>
+          </FadeUp>
+
+          <FadeUp delay={50}>
+            <FadeOutUp exitBefore={18}>
+              <p style={{
+                color: colors.cyan, fontFamily: font.body,
+                fontSize: 24, fontWeight: 300, letterSpacing: "0.2em",
+                textTransform: "uppercase", marginTop: 8, textAlign: "center",
+              }}>
+                Tecnologia a serviço do campo
+              </p>
+            </FadeOutUp>
           </FadeUp>
         </Screen>
       </Scene>
     );
+
+  return null;
 };
