@@ -817,10 +817,10 @@ export const Main = () => {
           <ScaleIn delay={0} config={SPRING_GENTLE}>
             <FadeOutScale exitBefore={24}>
               <Img
-                src={staticFile("/assets/image/img_logo.jpeg")}
+                src={staticFile("/assets/image/logo-redonda.png")}
                 alt="ZENITH AGRO"
                 style={{
-                  maxWidth: "100%", height: "auto", marginBottom: 24,
+                  width: 700, height: "auto", marginBottom: 24,
                 }}
               />
             </FadeOutScale>
